@@ -17,7 +17,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -29,6 +31,8 @@ public class BojService {
 
     private static final String SOLVED_AC_API_URL = "https://solved.ac/api/v3";
     private static final Duration CACHE_DURATION = Duration.ofHours(1); // 캐시 갱신 주기 : 1시간
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // 티어 정보 조회
     // 캐시된 데이터가 있고 유효기간이 지나지 않았다면 DB 정보 조회
@@ -44,33 +48,26 @@ public class BojService {
 
     // 티어 정보 수정 및 등록
     private BojUser updateBojUserInfo(Long userId, String bojId) {
-        // 1. bojId 저장/수정
-        Optional<BojUser> optionalBojUser = bojUserRepository.findByUserId(userId);
-        BojUser bojUser;
+        BojUser bojUser = bojUserRepository.findByUserId(userId)
+                .map(existing -> {
+                    existing.updateHandle(bojId);
+                    return existing;
+                })
+                .orElseGet(() -> {
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new NotFoundException("User not Found"));
+                    return BojUser.builder()
+                            .user(user)
+                            .handle(bojId)
+                            .lastUpdated(LocalDateTime.now())
+                            .build();
+                });
 
-        if (optionalBojUser.isPresent()) {
-            // 기존 BojUser가 있으면 handle 수정
-            bojUser = optionalBojUser.get();
-            bojUser.updateHandle(bojId);
-        } else {
-            // 없으면 새로 생성
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new NotFoundException("User not Found"));
-
-            bojUser = BojUser.builder()
-                    .user(user)
-                    .handle(bojId)
-                    .lastUpdated(LocalDateTime.now())
-                    .build();
-        }
-        bojUser = bojUserRepository.save(bojUser);  // DB에 저장
-
-        // 2. 그 다음 solved.ac API로 티어 정보 가져오기
+        // API 호출 먼저
         BojUserDto userInfo = fetchUserInfoFromSolvedAc(bojId);
 
-        // 3. tier 정보 업데이트
+        // tier 정보 업데이트 후 한 번만 저장
         bojUser.updateTierInfo(userInfo.getTier());
-
         return bojUserRepository.save(bojUser);
     }
 
@@ -81,14 +78,12 @@ public class BojService {
                 .retrieve() // HTTP 응답 받기
                 .bodyToMono(String.class)  // 응답 -> String으로 반환
                 .map(response -> {
-                    // ObjectMapper를 사용하여 응답을 BojUserDto로 변환
                     // 변환 실패시 RuntimeException 발생
-                    ObjectMapper mapper = new ObjectMapper();
                     try {
-                        System.out.println(response);
-                        return mapper.readValue(response, BojUserDto.class);
+                        log.debug("solved.ac API 응답: {}", response);
+                        return objectMapper.readValue(response, BojUserDto.class);
                     } catch (JsonProcessingException e) {
-                        System.out.println("JSON 파싱 에러: " + e.getMessage());
+                        log.error("JSON 파싱 에러: {}", e.getMessage(), e);
                         throw new RuntimeException("JSON 파싱 실패", e);
                     }
                 })
