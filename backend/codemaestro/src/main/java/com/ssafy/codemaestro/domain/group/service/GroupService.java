@@ -11,13 +11,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.*;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.*;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -35,8 +34,8 @@ public class GroupService {
     private  final ConferenceRepository conferenceRepository;
 
     // 그룹 생성
-    public GroupResponseDto createGroup(GroupRequestDto groupRequestDto) {
-        System.out.println(groupRequestDto.getUserId());
+    public GroupResponseDto createGroup(GroupRequestDto groupRequestDto, Long userId) {
+        log.debug("createGroup userId: {}", userId);
         User owner = userRepository.findById(groupRequestDto.getUserId())
                 .orElseThrow(() -> new BadRequestException("User not found"));
 
@@ -65,9 +64,6 @@ public class GroupService {
                 .orElseThrow(() -> new NotFoundException("Group not found"));
 
        groupJoinRequestRepository.deleteByGroup(group);
-
-
-
        groupRepository.delete(group);
     }
 
@@ -76,13 +72,9 @@ public class GroupService {
     public List<GroupResponseDto> getAllGroups() {
         List<Group> groups = groupRepository.findAll();
 
-        List<GroupResponseDto> groupResponseDtos = new ArrayList<>();
-        for(Group group : groups) {
-            GroupResponseDto gouGroupResponseDto = new GroupResponseDto(group);
-            groupResponseDtos.add(gouGroupResponseDto);
-        }
-
-        return groupResponseDtos;
+        return groups.stream()
+                .map(GroupResponseDto::new)
+                .collect(Collectors.toList());
     }
 
     // 개별 그룹 조회
@@ -90,11 +82,9 @@ public class GroupService {
     public List<GroupResponseDto> getUserGroups(Long userId) {
         List<GroupMember> groupMembers = groupMemberRepository.findByUserId(userId);
 
-        List<GroupResponseDto> groupResponseDtos = new ArrayList<>();
-        for (GroupMember groupMember : groupMembers) {
-            groupResponseDtos.add(new GroupResponseDto(groupMember.getGroup()));
-        }
-        return groupResponseDtos;
+        return groupMembers.stream()
+                .map(groupMember -> new GroupResponseDto(groupMember.getGroup()))
+                .collect(Collectors.toList());
     }
 
     // 그룹 상세 조회
@@ -166,14 +156,9 @@ public class GroupService {
             groups = groupRepository.findByNameContaining(groupName);
         }
 
-        // DTO 반환
-        List<GroupResponseDto> searchGroupsList = new ArrayList<>();
-        for(Group group : groups) {
-            GroupResponseDto dto = new GroupResponseDto(group);
-            searchGroupsList.add(dto);
-        }
-
-        return searchGroupsList;
+        return groups.stream()
+                .map(GroupResponseDto::new)
+                .collect(Collectors.toList());
     }
 
     // 그룹 랭킹 조회
@@ -198,13 +183,11 @@ public class GroupService {
                 memberHistoryRepository.findByParticipantIdAndGroupConferenceHistory_GroupId(userId, groupId);
 
         // DTO 반환
-        List<ConferenceParticipationDto> participations = new ArrayList<>();
-        for(GroupConferenceMemberHistory history : histories) {
-            ConferenceParticipationDto dto = ConferenceParticipationDto.from(history);
-            participations.add(dto);
-        }
+        List<ConferenceParticipationDto> participation = histories.stream()
+                .map(ConferenceParticipationDto::from)
+                .collect(Collectors.toList());
 
-        return new GroupConferenceStateResponse(totalConferences, participations);
+        return new GroupConferenceStateResponse(totalConferences, participation);
     }
 
     // 최근 5개의 회의별 그룹원 참여 여부
@@ -269,18 +252,12 @@ public class GroupService {
     }
 
     // 현재 진행중인 그룹 회의있는지 확인
-
-    public ResponseEntity<Long> checkCurrentGroupConference(Long groupId) {
+    public Optional<Long> checkCurrentGroupConference(Long groupId) {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Group not Found"));
 
         Optional<Conference> activeConference = conferenceRepository.findByGroup(group);
 
-        if(activeConference.isPresent()) {
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .body(activeConference.get().getId());
-        }
-
-        return ResponseEntity.ok().build();
+        return activeConference.map(Conference::getId);
     }
 }

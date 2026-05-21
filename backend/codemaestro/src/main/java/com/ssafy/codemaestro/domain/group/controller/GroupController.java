@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @RestController
@@ -47,8 +48,11 @@ public class GroupController {
 
     //  그룹 생성
     @PostMapping
-    public ResponseEntity<GroupResponseDto> createGroup(@RequestBody GroupRequestDto requestDto) {
-        return ResponseEntity.ok(groupService.createGroup(requestDto));
+    public ResponseEntity<GroupResponseDto> createGroup(
+            @RequestBody GroupRequestDto requestDto,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = Long.parseLong(userDetails.getUsername());
+        return ResponseEntity.ok(groupService.createGroup(requestDto, userId));
     }
 
     // 그룹 삭제
@@ -138,7 +142,7 @@ public class GroupController {
 
         Long userId = Long.parseLong(userDetails.getUsername());
         GroupConferenceStateResponse stats = groupService.getUserConferenceStats(groupId, userId);
-        System.out.println(stats);
+        log.debug("getUserConferenceStats: {}", stats);
         return ResponseEntity.ok(stats);
     }
 
@@ -152,6 +156,11 @@ public class GroupController {
     // 현재 그룹 회의가 활성화되어 있는지 확인
     @GetMapping("/conference/check")
     public ResponseEntity<Long> currentGroupConferenceCheck(@RequestParam Long groupId) {
-        return groupService.checkCurrentGroupConference(groupId);
+        Optional<Long> conferenceId = groupService.checkCurrentGroupConference(groupId);
+
+        if (conferenceId.isPresent()) {
+            return ResponseEntity.status(HttpStatus.FOUND).body(conferenceId.get());
+        }
+        return ResponseEntity.ok().build();
     }
 }
