@@ -82,6 +82,15 @@ public class SseService {
         return emitter;
     }
 
+    // 구독 종료
+    public void unsubscribe(Long userId) {
+        SseEmitter emitter = emitters.get(userId);
+        if (emitter != null) {
+            emitter.complete();
+            emitters.remove(userId);
+        }
+    }
+
     public void sendNotification(Long userId, String eventType, Object data) {
         SseEmitter emitter = emitters.get(userId);
 
@@ -106,7 +115,9 @@ public class SseService {
 
     private void saveToLostData(Long userId, Object data) {
         Queue<Object> lostData = lostDataMap.computeIfAbsent(userId, k -> new LinkedList<>());
-        lostData.offer(data);
+        if(lostData.size() < 100) { // 최대 100개만 저장
+            lostData.offer(data);
+        }
         log.debug("lost data : {} ", data);
     }
 
