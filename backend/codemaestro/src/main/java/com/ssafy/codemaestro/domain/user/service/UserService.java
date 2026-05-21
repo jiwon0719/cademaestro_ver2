@@ -8,13 +8,15 @@ import com.ssafy.codemaestro.global.exception.BadRequestException;
 import com.ssafy.codemaestro.global.exception.InvalidPasswordException;
 import com.ssafy.codemaestro.global.exception.UserNotFoundException;
 import com.ssafy.codemaestro.global.util.S3Util;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -25,7 +27,7 @@ public class UserService {
     private final S3Util s3Util;
 
     // 개인 정보 조회
-    // readOnly 로 바꾸기
+    @Transactional(readOnly = true) // 조회 전용
     public UserProfileResponseDto getUserProfile(Long userId) {
         return userRepository.findUserWithBojInfo(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
@@ -104,12 +106,8 @@ public class UserService {
         }
 
         // DTO 반환
-        List<UserProfileResponseDto> searchUserList = new ArrayList<>();
-        for(User user : users) {
-            UserProfileResponseDto dto = UserProfileResponseDto.from(user); // 이 부분 from 사용해서 수정
-            searchUserList.add(dto);
-        }
-
-        return searchUserList;
+        return users.stream()
+                .map(UserProfileResponseDto::from)
+                .collect(Collectors.toList());
     }
 }
