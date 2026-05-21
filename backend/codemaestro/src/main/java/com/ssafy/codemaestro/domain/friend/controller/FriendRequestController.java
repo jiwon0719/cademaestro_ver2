@@ -5,6 +5,8 @@ import com.ssafy.codemaestro.domain.friend.dto.FriendRequestDto;
 import com.ssafy.codemaestro.domain.friend.service.FriendRequestService;
 import lombok.*;
 import org.springframework.http.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import lombok.extern.slf4j.Slf4j;
 
@@ -40,14 +42,16 @@ public class FriendRequestController {
     }
 
     // 대기 중인 요청 조회
-    @GetMapping("/requests/{userId}/pending")
-    public ResponseEntity<List<FriendListResponseDto>> getPendingRequests(@PathVariable Long userId) {
+    @GetMapping("/requests/pending")
+    public ResponseEntity<List<FriendListResponseDto>> getPendingRequests(@AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = Long.parseLong(userDetails.getUsername());
         return ResponseEntity.ok(friendRequestService.getPendingRequests(userId));
     }
 
     // 친구 전체 목록 조회
-    @GetMapping("/users/{userId}/friends")
-    public ResponseEntity<List<FriendListResponseDto>> getAllFriends(@PathVariable Long userId) {
+    @GetMapping("/users/friends")
+    public ResponseEntity<List<FriendListResponseDto>> getAllFriends(@AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = Long.parseLong(userDetails.getUsername());
         return ResponseEntity.ok(friendRequestService.getAllFriends(userId));
     }
 

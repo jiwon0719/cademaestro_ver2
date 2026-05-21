@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -34,16 +35,10 @@ public class FriendRequestService {
     public void sendFriendRequest(FriendRequestDto request) {
         FriendRequest friendRequest = saveFriendRequest(request);
 
-        // sender와 receiver 정보 조회
-        User sender = userRepository.findById(request.getSenderId())
-                .orElseThrow(() -> new BadRequestException("Sender not found"));
-        User receiver = userRepository.findById(request.getReceiverId())
-                .orElseThrow(() -> new BadRequestException("Receiver not found"));
-
         // 알림 전송
         notificationService.sendFriendRequestNotification(
                 request.getReceiverId(),
-                FriendResponseDto.from(friendRequest, sender, receiver)
+                FriendResponseDto.from(friendRequest, friendRequest.getSender(), friendRequest.getReceiver())
         );
     }
 
@@ -72,16 +67,13 @@ public class FriendRequestService {
 
     // 친구 요청 수락
     public void acceptFriendRequest(Long requestId) {
-        Optional<FriendRequest> optionalRequest = friendRequestRepository.findById(requestId);
-        if (!optionalRequest.isPresent()) {
-            throw new IllegalArgumentException("Friend request not found");
+        FriendRequest request = friendRequestRepository.findById(requestId)
+                .orElseThrow(() -> new BadRequestException("Friend request not found"));
+
+
+        if (request.getStatus() != FriendRequestStatus.PENDING) {
+            throw new BadRequestException("이미 처리된 친구 요청입니다.");
         }
-
-        FriendRequest request = optionalRequest.get(); // 객체 가져오기
-
-//        if(!request.getStatus().equals("PENDING")) {
-//            throw new BadRequestException("is not PENDING");
-//        }
 
         request.accept(); // PENDING -> ACCEPTED
         friendRequestRepository.save(request); // DB 저장
@@ -90,16 +82,12 @@ public class FriendRequestService {
 
     // 친구 요청 거절
     public void rejectFriendRequest(Long requestId) {
-        Optional<FriendRequest> optionalRequest = friendRequestRepository.findById(requestId);
-        if(!optionalRequest.isPresent()) {
-            throw new IllegalArgumentException("Friend request not found");
+        FriendRequest request = friendRequestRepository.findById(requestId)
+                .orElseThrow(() -> new BadRequestException("Friend request not found"));
+
+        if (request.getStatus() != FriendRequestStatus.PENDING) {
+            throw new BadRequestException("이미 처리된 친구 요청입니다.");
         }
-
-        FriendRequest request = optionalRequest.get();
-
-//        if(!request.getStatus().equals("PENDING")) {
-//            throw new BadRequestException("is not PENDING");
-//        }
 
         request.reject();
         friendRequestRepository.save(request);
@@ -107,52 +95,33 @@ public class FriendRequestService {
 
     // 대기 중인 요청 조회
     public List<FriendListResponseDto> getPendingRequests(Long userId) {
-        List<FriendRequest> friendRequests = friendRequestRepository
-                .findByReceiverIdAndStatus(userId, FriendRequestStatus.PENDING);
-
-        List<FriendListResponseDto> friendListResponseDtos = new ArrayList<>();
-
-        for (FriendRequest friendRequest : friendRequests) {
-            // 요청자를 찾음
-            Long senderId = friendRequest.getSender().getId();
-            User sender = userRepository.findById(senderId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-
-            FriendListResponseDto responseDto = new FriendListResponseDto(
-                    sender.getId(),
-                    sender.getNickname(),
-                    sender.getProfileImageUrl(),
-                    friendRequest.getId()
-            );
-
-            friendListResponseDtos.add(responseDto);
-        }
-
-        return friendListResponseDtos;
+        return friendRequestRepository
+                .findByReceiverIdAndStatus(userId, FriendRequestStatus.PENDING)
+                .stream()
+                .map(fr -> new FriendListResponseDto(
+                        fr.getSender().getId(),
+                        fr.getSender().getNickname(),
+                        fr.getSender().getProfileImageUrl(),
+                        fr.getId()
+                ))
+                .collect(Collectors.toList());
     }
 
     // 친구 전체 목록 조회
     public List<FriendListResponseDto> getAllFriends(Long userId) {
-        List<FriendRequest> friendRequests = friendRequestRepository
-                .findAllFriendsByUserIdAndStatus(userId, FriendRequestStatus.ACCEPTED);
-
-        List<FriendListResponseDto> friendList = new ArrayList<>();
-
-        for (FriendRequest fr : friendRequests) {
-            // 내가 보낸 요청인지 받은 요청인지 확인 - 친구는 양방향 이니끼
-            Long friendId = fr.getSender().getId().equals(userId) ? fr.getReceiver().getId() : fr.getSender().getId();
-            User friend = userRepository.findById(friendId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-
-            friendList.add(new FriendListResponseDto(
-                    friend.getId(),
-                    friend.getNickname(),
-                    friend.getProfileImageUrl(),
-                    fr.getId()
-            ));
-        }
-
-        return friendList;
+        return friendRequestRepository
+                .findAllFriendsByUserIdAndStatus(userId, FriendRequestStatus.ACCEPTED)
+                .stream()
+                .map(fr -> {
+                    User friend = fr.getSender().getId().equals(userId) ? fr.getReceiver() : fr.getSender();
+                    return new FriendListResponseDto(
+                            friend.getId(),
+                            friend.getNickname(),
+                            friend.getProfileImageUrl(),
+                            fr.getId()
+                    );
+                })
+                .collect(Collectors.toList());
     }
 
     // 친구 삭제
