@@ -29,20 +29,27 @@ public class StudyRecordController {
             @PathVariable Long historyId,
             @RequestBody StudyRecordRequestDto requestDto,
             @AuthenticationPrincipal UserDetails userDetails) {
-
+        Long userId = Long.parseLong(userDetails.getUsername());
         StudyRecordResponseDto responseDto = studyRecordService.createStudyRecord(historyId, requestDto, Long.parseLong(userDetails.getUsername()));
         return ResponseEntity.ok(responseDto);
     }
 
     // 수정
     @PutMapping("/{recordId}")
-    public ResponseEntity<StudyRecordResponseDto> updateStudyRecord(@PathVariable Long recordId, @RequestBody StudyRecordRequestDto requestDto) {
-        return ResponseEntity.ok(studyRecordService.updateStudyRecord(recordId, requestDto));
+    public ResponseEntity<StudyRecordResponseDto> updateStudyRecord(
+            @PathVariable Long recordId,
+            @RequestBody StudyRecordRequestDto requestDto,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = Long.parseLong(userDetails.getUsername());
+        return ResponseEntity.ok(studyRecordService.updateStudyRecord(recordId, requestDto, userId));
     }
 
     @DeleteMapping("/{recordId}")
-    public ResponseEntity<Void> deleteStudyRecord(@PathVariable Long recordId) {
-        studyRecordService.deleteStudyRecord(recordId);
+    public ResponseEntity<Void> deleteStudyRecord(
+            @PathVariable Long recordId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = Long.parseLong(userDetails.getUsername());
+        studyRecordService.deleteStudyRecord(recordId, userId);
         return ResponseEntity.noContent().build();
     }
 }

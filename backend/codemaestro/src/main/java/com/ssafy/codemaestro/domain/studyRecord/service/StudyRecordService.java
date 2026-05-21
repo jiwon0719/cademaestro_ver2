@@ -47,20 +47,28 @@ public class StudyRecordService {
 
     // 수정
     @Transactional
-    public StudyRecordResponseDto updateStudyRecord(Long recordId, StudyRecordRequestDto requestDto) {
+    public StudyRecordResponseDto updateStudyRecord(Long recordId, StudyRecordRequestDto requestDto, Long userId) {
         StudyRecord record = studyRecordRepository.findById(recordId)
                 .orElseThrow(() -> new BadRequestException("Study record not Found"));
 
-        record.setStudyContent(requestDto.getStudyContent());
+        if (!record.getConferenceMemberHistory().getParticipant().getId().equals(userId)) {
+            throw new UnauthorizedException("접근되지 않은 사용자입니다.");
+        }
 
+        record.setStudyContent(requestDto.getStudyContent());
         return StudyRecordResponseDto.from(studyRecordRepository.save(record));
     }
 
     // 삭제
     @Transactional
-    public void deleteStudyRecord(Long recordId) {
+    public void deleteStudyRecord(Long recordId, Long userId) {
         StudyRecord record = studyRecordRepository.findById(recordId)
                 .orElseThrow(() -> new BadRequestException("Study Record not found"));
+
+        if (!record.getConferenceMemberHistory().getParticipant().getId().equals(userId)) {
+            throw new UnauthorizedException("접근되지 않은 사용자입니다.");
+        }
+
         studyRecordRepository.delete(record);
     }
 }
