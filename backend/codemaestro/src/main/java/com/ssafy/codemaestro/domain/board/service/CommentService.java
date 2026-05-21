@@ -15,6 +15,7 @@ import org.springframework.stereotype.*;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -29,14 +30,10 @@ public class CommentService {
     // 게시글 별 댓글 조회
     public List<CommentResponseDto> getCommentsByBoardId(long boardId) {
         List<Comment> comments = commentRepository.findByBoardId(boardId);
-        List<CommentResponseDto> commentDtoList = new ArrayList<>();
 
-        for(Comment comment : comments) {
-            CommentResponseDto dto = CommentResponseDto.from(comment);
-            commentDtoList.add(dto);
-        }
-
-        return commentDtoList;
+        return comments.stream()
+                .map(CommentResponseDto::from)
+                .collect(Collectors.toList());
     }
 
     // 댓글 생성

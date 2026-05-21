@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -23,14 +24,10 @@ public class BoardService {
     // 게시글 전체 조회
     public List<BoardResponseDto> getAllBoards() {
         List<Board> boards = boardRepository.findAllWithWriter();
-        List<BoardResponseDto> boardDtoList = new ArrayList<>();
 
-        for (Board board : boards) {
-            BoardResponseDto dto = BoardResponseDto.from(board);
-            boardDtoList.add(dto);
-        }
-
-        return boardDtoList;
+        return boards.stream()
+                .map(BoardResponseDto::from)
+                .collect(Collectors.toList());
     }
 
 
