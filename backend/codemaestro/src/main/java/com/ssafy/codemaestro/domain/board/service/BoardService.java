@@ -57,9 +57,14 @@ public class BoardService {
 
     // 게시글 수정
     @Transactional
-    public BoardResponseDto updateBoard(Long id, BoardRequestDto requestDto) {
+    public BoardResponseDto updateBoard(Long id, BoardRequestDto requestDto, Long userId) {
         Board board = boardRepository.findById(id)
                 .orElseThrow(() -> new BadRequestException("Board not found"));
+
+        // 작성자 검증 추가
+        if (!board.getWriter().getId().equals(userId)) {
+            throw new BadRequestException("수정 권한이 없습니다");
+        }
 
         board.setTitle(requestDto.getTitle());
         board.setContent(requestDto.getContent());
@@ -69,9 +74,15 @@ public class BoardService {
 
     // 게시글 삭제
     @Transactional
-    public void deleteBoard(Long id) {
+    public void deleteBoard(Long id, Long userId) {
         Board board = boardRepository.findById(id)
                 .orElseThrow(() -> new BadRequestException("Board not found"));
+
+        // 작성자 검증 추가
+        if (!board.getWriter().getId().equals(userId)) {
+            throw new BadRequestException("삭제 권한이 없습니다");
+        }
+
         boardRepository.delete(board);
     }
 }
