@@ -1,10 +1,12 @@
 package com.ssafy.codemaestro.domain.board.controller;
 
+import com.ssafy.codemaestro.domain.board.dto.BoardResponseDto;
 import com.ssafy.codemaestro.domain.board.dto.CommentRequestDto;
 import com.ssafy.codemaestro.domain.board.dto.CommentResponseDto;
 import com.ssafy.codemaestro.domain.board.service.CommentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,9 +28,9 @@ public class CommentController {
 
     // 댓글 생성
     @PostMapping
-    public ResponseEntity<?> createComment(@RequestBody CommentRequestDto requestDto) {
-        commentService.createComment(requestDto);
-        return ResponseEntity.ok("Comment create Ok");
+    public ResponseEntity<CommentResponseDto> createComment(@RequestBody CommentRequestDto requestDto) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(commentService.createComment(requestDto));
     }
 
     // 댓글 삭제

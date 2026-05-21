@@ -38,7 +38,7 @@ public class CommentService {
 
     // 댓글 생성
     @Transactional
-    public void createComment(CommentRequestDto commentRequestDto) {
+    public CommentResponseDto createComment(CommentRequestDto commentRequestDto) {
         Board board = boardRepository.findById(commentRequestDto.getBoardId())
                 .orElseThrow(() -> new BadRequestException("Board not Found"));
         User user = userRepository.findById(commentRequestDto.getUserId())
@@ -49,14 +49,16 @@ public class CommentService {
         comment.setBoard(board);
         comment.setWriter(user);
 
-        commentRepository.save(comment);
+        Comment savedComment = commentRepository.save(comment);
 
         // Board 작성자에게 알림 전송
         Long boardWriter = board.getWriter().getId();
         notificationService.sendCommentNotification(
                 boardWriter,
-                CommentResponseDto.from(comment)
+                CommentResponseDto.from(savedComment)
         );
+
+        return CommentResponseDto.from(savedComment);
     }
 
     // 댓글 삭제
