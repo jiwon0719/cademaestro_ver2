@@ -4,6 +4,7 @@ import com.ssafy.codemaestro.domain.group.repository.GroupConferenceHistoryRepos
 import com.ssafy.codemaestro.domain.group.repository.GroupRepository;
 import com.ssafy.codemaestro.domain.notification.service.NotificationService;
 import com.ssafy.codemaestro.domain.openvidu.dto.ConferenceConnectResponse;
+import com.ssafy.codemaestro.domain.openvidu.dto.ConferenceInfoResponse;
 import com.ssafy.codemaestro.domain.openvidu.repository.ConferenceRepository;
 import com.ssafy.codemaestro.domain.openvidu.repository.ConferenceTagRepository;
 import com.ssafy.codemaestro.domain.openvidu.repository.UserConferenceRepository;
@@ -262,13 +263,49 @@ public class ConferenceService {
         }
     }
 
-    public Conference getConference(String conferenceId) {
-        return conferenceRepository.findById(Long.valueOf(conferenceId)).orElseThrow(() -> new CannotFindSessionException("Conference를 찾을 수 없습니다. : conferenceId : " + conferenceId));
+    @Transactional(readOnly = true)
+    public ConferenceInfoResponse getConferenceInfo(String conferenceId) {
+        Conference conference = conferenceRepository.findById(Long.valueOf(conferenceId))
+                .orElseThrow(() -> new CannotFindSessionException("Conference를 찾을 수 없습니다 : conferenceId : " +
+                        conferenceId));
+
+        int participantNum = (int) conferenceRepository.countConferenceById(conference.getId());
+
+        return ConferenceInfoResponse.builder()
+                .conferenceId(conferenceId)
+                .title(conference.getTitle())
+                .description(conference.getDescription())
+                .isPrivate(conference.getAccessCode() != null)
+                .thumbnailUrl(conference.getThumbnailUrl())
+                .hostNickName(conference.getModerator().getNickname())
+                .participantNum(participantNum)
+                .tagNameList(ConferenceTag.toTagNameList(conference.getTags()))
+                .createdAt(conference.getCreatedAt())
+                .build();
     }
 
-    public List<Conference> getAllConferences() {
-        return conferenceRepository.findAll();
+    @Transactional(readOnly = true)
+    public List<ConferenceInfoResponse> getAllConferenceInfos() {
+        List<Conference> conferenceList = conferenceRepository.findAll();
+
+        return conferenceList.stream()
+                .map(conference -> {
+                    int participantNum = (int) conferenceRepository.countConferenceById(conference.getId());
+                    return ConferenceInfoResponse.builder()
+                            .conferenceId(conference.getId().toString())
+                            .title(conference.getTitle())
+                            .description(conference.getDescription())
+                            .isPrivate(conference.getAccessCode() != null)
+                            .thumbnailUrl(conference.getThumbnailUrl())
+                            .hostNickName(conference.getModerator().getNickname())
+                            .participantNum(participantNum)
+                            .tagNameList(ConferenceTag.toTagNameList(conference.getTags()))
+                            .createdAt(conference.getCreatedAt())
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
+
 
     public int getParticipantNum(String conferenceId) {
         return (int) conferenceRepository.countConferenceById(Long.valueOf(conferenceId));

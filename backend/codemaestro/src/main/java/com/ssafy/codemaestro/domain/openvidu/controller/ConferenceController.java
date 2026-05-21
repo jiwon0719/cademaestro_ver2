@@ -6,6 +6,7 @@ import com.ssafy.codemaestro.domain.openvidu.service.ConferenceService;
 import com.ssafy.codemaestro.global.entity.Conference;
 import com.ssafy.codemaestro.global.entity.ConferenceTag;
 import com.ssafy.codemaestro.global.entity.User;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -20,13 +21,9 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/conference")
+@RequiredArgsConstructor
 public class ConferenceController {
     private final ConferenceService conferenceService;
-
-    @Autowired
-    public ConferenceController(ConferenceService conferenceService) {
-        this.conferenceService = conferenceService;
-    }
 
     /**
      * 회의실을 생성합니다.
@@ -38,7 +35,7 @@ public class ConferenceController {
     public ResponseEntity<ConferenceInitResponse> initializeConference(@ModelAttribute ConferenceInitRequest dto,
                                                                        @AuthenticationPrincipal CustomUserDetails userDetails) {
         User currentUser = userDetails.getUser();
-        System.out.println(dto);
+        log.debug("initializeConference dto: {}", dto);
 
         String conferenceId = conferenceService.initializeConference(
                 currentUser,
@@ -71,36 +68,16 @@ public class ConferenceController {
         return new ResponseEntity<>((response), HttpStatus.OK);
     }
 
-    /**
-     * 모든 회의의 정보를 가공해서 리턴함
-     * @return
-     */
+    // 전체 컨퍼런스 조회
     @GetMapping("")
-    @Transactional(readOnly = true) // LAZY 로딩 문제 해결
     public ResponseEntity<List<ConferenceInfoResponse>> getAllConferenceInfo() {
-        List<Conference> conferenceList = conferenceService.getAllConferences();
+        return ResponseEntity.ok(conferenceService.getAllConferenceInfos());
+    }
 
-        List<ConferenceInfoResponse> responseList = new ArrayList<>();
-
-        for (Conference conference : conferenceList) {
-            int participantNum = conferenceService.getParticipantNum(String.valueOf(conference.getId()));
-
-            ConferenceInfoResponse conferenceInfo = ConferenceInfoResponse.builder()
-                    .conferenceId(conference.getId().toString())
-                    .title(conference.getTitle())
-                    .description(conference.getDescription())
-                    .isPrivate(conference.getAccessCode() != null)
-                    .thumbnailUrl(conference.getThumbnailUrl())
-                    .hostNickName(conference.getModerator().getNickname())
-                    .participantNum(participantNum)
-                    .tagNameList(ConferenceTag.toTagNameList(conference.getTags()))
-                    .createdAt(conference.getCreatedAt())
-                    .build();
-
-            responseList.add(conferenceInfo);
-        }
-
-        return new ResponseEntity<>(responseList, HttpStatus.OK);
+    // 특정 컨퍼런스 조회
+    @GetMapping("/{conferenceId}")
+    public ResponseEntity<ConferenceInfoResponse> conferenceInfo(@PathVariable String conferenceId) {
+        return ResponseEntity.ok(conferenceService.getConferenceInfo(conferenceId));
     }
 
     @PostMapping("/{conferenceId}/pre-check")
@@ -114,33 +91,6 @@ public class ConferenceController {
         } else {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
-    }
-
-    /**
-     * 특정 컨퍼런스의 정보를 반환함
-     * @param conferenceId
-     * @return
-     */
-    @GetMapping("/{conferenceId}")
-    @Transactional(readOnly = true) // LAZY 로딩 문제 해결
-    public ResponseEntity<ConferenceInfoResponse> conferenceInfo(@PathVariable String conferenceId) {
-        Conference conference = conferenceService.getConference(conferenceId);
-
-        int participantNum = conferenceService.getParticipantNum(String.valueOf(conference.getId()));
-
-        ConferenceInfoResponse conferenceInfo = ConferenceInfoResponse.builder()
-                .conferenceId(conferenceId)
-                .title(conference.getTitle())
-                .description(conference.getDescription())
-                .isPrivate(conference.getAccessCode() != null)
-                .thumbnailUrl(conference.getThumbnailUrl())
-                .hostNickName(conference.getModerator().getNickname())
-                .participantNum(participantNum)
-                .tagNameList(ConferenceTag.toTagNameList(conference.getTags()))
-                .createdAt(conference.getCreatedAt())
-                .build();
-
-        return new ResponseEntity<>(conferenceInfo, HttpStatus.OK);
     }
 
     /**
