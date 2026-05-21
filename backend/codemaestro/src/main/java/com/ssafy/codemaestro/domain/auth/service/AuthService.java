@@ -12,6 +12,8 @@ import com.ssafy.codemaestro.global.entity.User;
 import com.ssafy.codemaestro.domain.user.repository.UserRepository;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.mail.MessagingException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,8 @@ import java.security.SecureRandom;
 import java.util.Date;
 
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class AuthService {
     private final UserRepository userRepository;
     private final RefreshRepository refreshRepository;
@@ -28,16 +32,6 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final MailUtil mailUtil;
     private final PasswordEncoder passwordEncoder;
-
-    @Autowired
-    public AuthService(UserRepository userRepository, RefreshRepository refreshRepository, VerifyEmailRepository verifyEmailRepository, JwtUtil jwtUtil, MailUtil mailUtil, PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.refreshRepository = refreshRepository;
-        this.verifyEmailRepository = verifyEmailRepository;
-        this.jwtUtil = jwtUtil;
-        this.mailUtil = mailUtil;
-        this.passwordEncoder = passwordEncoder;
-    }
 
     /**
      * 회원가입
@@ -55,7 +49,7 @@ public class AuthService {
         // 새로운 유저 생성
         User user = new User();
 
-        System.out.println(signUpDto);
+        log.debug("signup request: {}", signUpDto);
         user.setEmail(signUpDto.getEmail());
         user.setPassword(passwordEncoder.encode(signUpDto.getPassword()));
         user.setNickname(signUpDto.getNickname());
@@ -131,8 +125,7 @@ public class AuthService {
         try {
             mailUtil.send(user.getEmail(), "CodeMaestro 비밀번호 재설정", "<h1>새로운 비밀번호입니다.</h1> <h4>" + password + "</h4>");
         } catch (MessagingException e) {
-            System.err.println("비밀번호 찾기 메일 발송 오류 발생.");
-            e.printStackTrace();
+            log.error("비밀번호 찾기 메일 발송 오류 발생.", e);
             return false;
         }
 

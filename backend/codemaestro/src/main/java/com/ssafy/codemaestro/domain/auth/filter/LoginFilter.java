@@ -7,6 +7,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,6 +22,7 @@ import java.util.Enumeration;
 /**
  * Security의 formLogin 비활성화로 인해 UsernamePasswordAuthenticationToken이 비활성화 된 것을 강제로 다시 활성화 시켜줌.
  */
+@Slf4j
 public class LoginFilter extends UsernamePasswordAuthenticationFilter {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
@@ -46,13 +48,7 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
         String username = obtainUsername(request);
         String password = obtainPassword(request);
 
-        Enumeration<String> s = request.getHeaderNames();
-        while (s.hasMoreElements()) {
-            System.out.println(s.nextElement());
-        }
-
-        System.out.println("attemptAuthentication: " + username);
-        System.out.println("attemptAuthentication: " + password);
+        log.debug("attemptAuthentication username: {}", username);
 
         UsernamePasswordAuthenticationToken authRequest = new UsernamePasswordAuthenticationToken(username, password, null);
 

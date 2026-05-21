@@ -2,6 +2,7 @@ package com.ssafy.codemaestro.domain.auth.filter;
 
 import com.ssafy.codemaestro.domain.auth.entty.CustomUserDetails;
 import com.ssafy.codemaestro.global.entity.User;
+import com.ssafy.codemaestro.global.exception.UserNotFoundException;
 import com.ssafy.codemaestro.global.util.JwtUtil;
 import com.ssafy.codemaestro.domain.user.repository.UserRepository;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -70,7 +71,8 @@ public class JwtFilter extends OncePerRequestFilter {
         // user Id를 기반으로 User Entity 획득
         long userId = Long.valueOf(jwtUtil.getId(accessToken));
 
-        User user = userRepository.findById(userId).get();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         CustomUserDetails customUserDetails = new CustomUserDetails(user);
 
