@@ -1,7 +1,9 @@
 package com.ssafy.codemaestro.domain.notification.service;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -9,19 +11,22 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class SseService {
     @Getter
     private final Map<Long, SseEmitter> emitters = new ConcurrentHashMap<>();
-    private final Map<Long, Queue<Object>> lostDataMap = new ConcurrentHashMap<>();
+    private final RedisTemplate<String, Object> redisTemplate;
+
     private static final long TIMEOUT = 60 * 60 * 1000L;
+    private static final String LOST_DATA_KEY_PREFIX = "lost-notifications:";
+    private static final long LOST_DATA_TTL_DAYS = 7;
 
     // 구독
     public SseEmitter subscribe(Long userId) {
-        // 1. 먼저 미수신 데이터 큐를 초기화/확인
-        Queue<Object> lostData = lostDataMap.computeIfAbsent(userId, k -> new LinkedList<>());
-
         // 2. 이전 연결이 있다면 정리
         emitters.remove(userId);
 
@@ -47,20 +52,20 @@ public class SseService {
         });
 
         try {
-            // 5. 미수신 데이터 전송 시도
-            if (!lostData.isEmpty()) { // 미수신 데이터가 있다면,
-                List<Object> dataToSend = new ArrayList<>(lostData);
-                lostData.clear(); // 큐 비우기
+            // 4. Redis에서 미수신 데이터 꺼내서 전송
+            String key = LOST_DATA_KEY_PREFIX + userId;
+            List<Object> lostData = redisTemplate.opsForList().range(key, 0, -1);
+            redisTemplate.delete(key);
 
-                for (Object data : dataToSend) {
+            if (lostData != null && !lostData.isEmpty()) {
+                for (Object data : lostData) {
                     try {
-                        log.info("Sending lost data item to userId {}: {}", userId, data);
                         emitter.send(SseEmitter.event()
                                 .name("lost-data")
                                 .data(data));
                     } catch (IOException e) {
-                        log.error("Failed to send lost data item to userId: {}", userId, e);
-                        lostData.offer(data); // 실패한 데이터 다시 큐에 넣기
+                        log.error("Failed to send lost data to userId: {}", userId, e);
+                        saveToLostData(userId, data);
                     }
                 }
             }
@@ -114,15 +119,10 @@ public class SseService {
     }
 
     private void saveToLostData(Long userId, Object data) {
-        Queue<Object> lostData = lostDataMap.computeIfAbsent(userId, k -> new LinkedList<>());
-        if(lostData.size() < 100) { // 최대 100개만 저장
-            lostData.offer(data);
-        }
-        log.debug("lost data : {} ", data);
-    }
-
-    public Queue<Object> getLostData(Long userId) {
-        return lostDataMap.getOrDefault(userId, new LinkedList<>());
+        String key = LOST_DATA_KEY_PREFIX + userId;
+        redisTemplate.opsForList().rightPush(key, data);
+        redisTemplate.expire(key, LOST_DATA_TTL_DAYS, TimeUnit.DAYS);
+        log.debug("lost data saved to Redis : userId={}", userId);
     }
 
     @Scheduled(fixedRate = 60000) // 1분마다 실행
