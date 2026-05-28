@@ -10,6 +10,8 @@ import com.ssafy.codemaestro.domain.boj.repository.BojUserRepository;
 import com.ssafy.codemaestro.global.entity.User;
 import com.ssafy.codemaestro.global.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -35,19 +37,27 @@ public class BojService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // 티어 정보 조회
-    // 캐시된 데이터가 있고 유효기간이 지나지 않았다면 DB 정보 조회
-    // 없거나 만료되었다면 백준API 호출
+    @Cacheable(value = "bojUser", key = "#bojId")
     @Transactional
     public BojUserResponse getTierInfo(Long userId, String bojId) {
-        BojUser bojUser = bojUserRepository.findByHandle(bojId) // DB 정보 조회
-                .filter(user -> user.getLastUpdated().plus(CACHE_DURATION).isAfter(LocalDateTime.now())) // 유효기간 확인
-                .orElseGet(() -> updateBojUserInfo(userId, bojId)); // 필요한 경우에만 실행(지연실행)
+        BojUser bojUser = bojUserRepository.findByHandle(bojId)
+                .orElseGet(() -> updateBojUserInfo(userId, bojId));
 
-        return convertToResponse(bojUser); // 엔티티 -> DTO 변환
+        return convertToResponse(bojUser);
     }
 
     // 티어 정보 수정 및 등록
-    private BojUser updateBojUserInfo(Long userId, String bojId) {
+    // private -> public으로 수정한 이유
+    // Redis : Spring AOP 기반으로 동작하는데, private 메서드에는 AOP가 적용 안됨
+    // Spring AOP는 프록시 패턴을 사용하는데 private 메서드는 프록시가 가로챌 수 없음
+    /**
+     *
+     * @param userId
+     * @param bojId
+     * @return
+     */
+    @CacheEvict(value = "bojUser", key = "#bojId")
+    public BojUser updateBojUserInfo(Long userId, String bojId) {
         BojUser bojUser = bojUserRepository.findByUserId(userId)
                 .map(existing -> {
                     existing.updateHandle(bojId);

@@ -1,0 +1,15 @@
+### 회원가입
+POST http://localhost:8080/auth/signup
+Content-Type: application/x-www-form-urlencoded
+
+email=test@test.com&password=test1234&nickname=테스터
+
+### 로그인
+POST http://localhost:8080/auth/signin
+Content-Type: application/x-www-form-urlencoded
+
+username=test@test.com&password=test1234
+
+### BOJ 티어 조회
+GET http://localhost:8080/boj/tier?bojId=hjw9265
+access: eyJhbGciOiJIUzI1NiJ9.eyJjYXRlZ29yeSI6ImFjY2VzcyIsImlkIjoiMSIsImlhdCI6MTc3OTk0ODM2OCwiZXhwIjoxNzc5OTQ4OTY4fQ.N4305Gjr3GjpoC_FbdZBCX8_J5hjRVtwvwZYZ5_9-2o
